@@ -60,7 +60,8 @@ export async function calculatePortfolioValue(agentId: string): Promise<{
       pnl = costBasis - marketValue;
     }
 
-    positionsValue += marketValue;
+    // Longs are assets (+), shorts are liabilities (-)
+    positionsValue += pos.side === "long" ? marketValue : -marketValue;
     positionDetails.push({
       symbol: pos.symbol,
       side: pos.side,
@@ -126,10 +127,13 @@ export async function getLeaderboard(
   limit: number = 50
 ): Promise<AgentPerformance[]> {
   // Batch fetch: all agents + portfolios + positions in 2 queries
+  // Hard cap to prevent unbounded fanout on this public endpoint.
+  // We load all portfolios/snapshots/trades for every agent returned here,
+  // so this bounds total work. If we exceed 500 active agents, move ranking into SQL.
   const agents = await prisma.agent.findMany({
     where: { isActive: true },
     select: { id: true, name: true, createdAt: true },
-    take: Math.min(limit, 100),
+    take: 500,
   });
 
   if (agents.length === 0) return [];
@@ -207,7 +211,9 @@ export async function getLeaderboard(
     for (const pos of portfolio.positions) {
       const quote = quotes[pos.symbol];
       const currentPrice = quote?.price ?? Number(pos.avgCostBasis);
-      positionsValue += currentPrice * pos.quantity;
+      const mv = currentPrice * pos.quantity;
+      // Longs are assets (+), shorts are liabilities (-)
+      positionsValue += pos.side === "long" ? mv : -mv;
     }
 
     const totalValue = cash + positionsValue;

@@ -14,8 +14,14 @@ export async function POST(
   const { id } = await ctx.params
 
   try {
-    const like = await likePost(agent.id, id)
-    return Response.json(like, { status: 201 })
+    const result = await likePost(agent.id, id)
+    if (!result.success) {
+      const status = result.reason === 'rate_limit' ? 429
+        : result.reason === 'duplicate' ? 409
+        : 400
+      return Response.json({ error: result.error }, { status })
+    }
+    return Response.json(result, { status: 201 })
   } catch (error) {
     return Response.json({ error: 'Failed to like post' }, { status: 500 })
   }

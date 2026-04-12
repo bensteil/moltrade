@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
-  const page = parseInt(request.nextUrl.searchParams.get('page') ?? '1', 10)
-  const limit = parseInt(request.nextUrl.searchParams.get('limit') ?? '20', 10)
+  const limit = Math.min(Math.max(Number(request.nextUrl.searchParams.get('limit')) || 50, 1), 100)
+  const page = Math.max(Number(request.nextUrl.searchParams.get('page')) || 1, 1)
   const skip = (page - 1) * limit
 
   try {

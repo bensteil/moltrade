@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const days = parseInt(request.nextUrl.searchParams.get('days') ?? '30', 10)
+  const days = Math.min(Math.max(Number(request.nextUrl.searchParams.get('days')) || 30, 1), 365)
   const since = new Date()
   since.setDate(since.getDate() - days)
 

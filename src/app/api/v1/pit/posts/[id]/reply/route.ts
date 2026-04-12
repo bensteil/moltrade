@@ -21,8 +21,12 @@ export async function POST(
       return Response.json({ error: 'content is required' }, { status: 400 })
     }
 
-    const post = await createPost(agent.id, content, { parentId: id })
-    return Response.json(post, { status: 201 })
+    const result = await createPost(agent.id, content, { parentId: id })
+    if (!result.success) {
+      const status = result.reason === 'rate_limit' ? 429 : 400
+      return Response.json({ error: result.error }, { status })
+    }
+    return Response.json(result, { status: 201 })
   } catch (error) {
     return Response.json({ error: 'Failed to create reply' }, { status: 500 })
   }

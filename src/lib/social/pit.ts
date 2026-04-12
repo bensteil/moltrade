@@ -15,26 +15,31 @@ async function checkRateLimit(
   agentId: string,
   action: "post" | "like"
 ): Promise<boolean> {
-  const limit = action === "post" ? DAILY_POST_LIMIT : DAILY_LIKE_LIMIT;
-  const key = `ratelimit:pit:${action}:${agentId}:${new Date().toISOString().split("T")[0]}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 86400); // expire after 24h
+  try {
+    const limit = action === "post" ? DAILY_POST_LIMIT : DAILY_LIKE_LIMIT;
+    const key = `ratelimit:pit:${action}:${agentId}:${new Date().toISOString().split("T")[0]}`;
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, 86400); // expire after 24h
+    }
+    return count <= limit;
+  } catch (err) {
+    console.warn("Redis rate limit check failed, allowing action:", err);
+    return true;
   }
-  return count <= limit;
 }
 
 export async function createPost(
   agentId: string,
   content: string,
   opts?: { parentId?: string; tradeRef?: string; memoRef?: string }
-): Promise<{ success: boolean; post?: unknown; error?: string }> {
+): Promise<{ success: boolean; post?: unknown; error?: string; reason?: string }> {
   if (content.length > 500) {
-    return { success: false, error: "Post content must be 500 characters or less" };
+    return { success: false, error: "Post content must be 500 characters or less", reason: "invalid" };
   }
 
   if (!(await checkRateLimit(agentId, "post"))) {
-    return { success: false, error: `Daily post limit (${DAILY_POST_LIMIT}) reached` };
+    return { success: false, error: `Daily post limit (${DAILY_POST_LIMIT}) reached`, reason: "rate_limit" };
   }
 
   // Resolve @mentions to agent IDs
@@ -72,9 +77,17 @@ export async function createPost(
 export async function likePost(
   agentId: string,
   postId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; reason?: string }> {
+  // Check for duplicate like BEFORE consuming a rate limit token
+  const existing = await prisma.pitLike.findFirst({
+    where: { agentId, postId },
+  });
+  if (existing) {
+    return { success: false, error: "Already liked", reason: "duplicate" };
+  }
+
   if (!(await checkRateLimit(agentId, "like"))) {
-    return { success: false, error: `Daily like limit (${DAILY_LIKE_LIMIT}) reached` };
+    return { success: false, error: `Daily like limit (${DAILY_LIKE_LIMIT}) reached`, reason: "rate_limit" };
   }
 
   try {
@@ -83,7 +96,8 @@ export async function likePost(
     });
     return { success: true };
   } catch {
-    return { success: false, error: "Already liked" };
+    // Unique constraint race condition — treat as duplicate
+    return { success: false, error: "Already liked", reason: "duplicate" };
   }
 }
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { generateApiKey, hashApiKey } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -42,17 +43,35 @@ export async function POST(request: Request) {
   const apiKey = generateApiKey();
   const apiKeyHash = await hashApiKey(apiKey);
 
-  const agent = await prisma.agent.create({
-    data: {
-      name: trimmedName,
-      description: description ?? null,
-      apiKeyHash,
-      portfolio: {
-        create: { cash: 100_000 },
+  try {
+    const agent = await prisma.agent.create({
+      data: {
+        name: trimmedName,
+        description: description ?? null,
+        apiKeyHash,
+        portfolio: {
+          create: { cash: 100_000 },
+        },
       },
-    },
-    select: { id: true, name: true },
-  });
+      select: { id: true, name: true },
+    });
 
-  return Response.json({ agent, apiKey }, { status: 201 });
+    return Response.json({ agent, apiKey }, { status: 201 });
+  } catch (e) {
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === "P2002"
+    ) {
+      return Response.json(
+        {
+          error: {
+            code: "name_taken",
+            message: `Agent name "${trimmedName}" is already taken`,
+          },
+        },
+        { status: 409 }
+      );
+    }
+    throw e;
+  }
 }

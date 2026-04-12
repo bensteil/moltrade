@@ -76,7 +76,16 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
   // 4. Execute validation + trade in a single transaction
   try {
   const trade = await prisma.$transaction(async (tx) => {
-    // Fetch portfolio INSIDE transaction for consistency
+    // Lock the portfolio row to prevent concurrent trades from double-spending
+    try {
+      await tx.$queryRaw`SELECT 1 FROM portfolios WHERE agent_id = ${req.agentId} FOR UPDATE NOWAIT`;
+    } catch (lockErr: any) {
+      if (lockErr?.code === "P2010" || lockErr?.message?.includes("could not obtain lock")) {
+        throw new Error("JSON:trade_busy:Another trade is in progress, please retry");
+      }
+      throw lockErr;
+    }
+
     const portfolio = await tx.portfolio.findUnique({
       where: { agentId: req.agentId },
       include: { positions: true },
@@ -106,9 +115,11 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         break;
       }
       case "short": {
-        const marginRequired = totalValue * SHORT_MARGIN_REQUIREMENT;
-        if (marginRequired > cash) {
-          throw new Error(`JSON:insufficient_margin:Need $${marginRequired.toFixed(2)} margin (150%) but only have $${cash.toFixed(2)}`);
+        // Net cash needed: you receive totalValue in proceeds but must reserve 150% as margin
+        // Net impact = totalValue * (SHORT_MARGIN_REQUIREMENT - 1) = totalValue * 0.5
+        const netCashRequired = totalValue * (SHORT_MARGIN_REQUIREMENT - 1);
+        if (netCashRequired > cash) {
+          throw new Error(`JSON:insufficient_margin:Need $${netCashRequired.toFixed(2)} net margin (50% of $${totalValue.toFixed(2)}) but only have $${cash.toFixed(2)}`);
         }
         break;
       }
@@ -207,11 +218,12 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         });
       }
     } else if (req.side === "short") {
-      // Reserve margin (150% of short value)
-      const marginReserved = totalValue * SHORT_MARGIN_REQUIREMENT;
+      // Net cash impact: receive sale proceeds (totalValue) but reserve 150% margin
+      // Net deduction = totalValue * (SHORT_MARGIN_REQUIREMENT - 1) = totalValue * 0.5
+      const netCashDeduction = totalValue * (SHORT_MARGIN_REQUIREMENT - 1);
       await tx.portfolio.update({
         where: { agentId: req.agentId },
-        data: { cash: { decrement: marginReserved } },
+        data: { cash: { decrement: netCashDeduction } },
       });
 
       const existing = await tx.position.findUnique({
@@ -260,14 +272,13 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         },
       });
 
-      const originalMargin =
-        Number(shortPosition!.avgCostBasis) *
-        req.quantity *
-        SHORT_MARGIN_REQUIREMENT;
+      // On open, we deducted: originalValue * (SHORT_MARGIN_REQUIREMENT - 1)
+      // On cover, return that net margin plus P&L
+      const originalValue = Number(shortPosition!.avgCostBasis) * req.quantity;
+      const netMarginHeld = originalValue * (SHORT_MARGIN_REQUIREMENT - 1);
       const coverCost = totalValue;
-      const shortProceeds = Number(shortPosition!.avgCostBasis) * req.quantity;
-      const pnl = shortProceeds - coverCost;
-      const cashReturn = originalMargin + pnl;
+      const pnl = originalValue - coverCost; // profit if price dropped
+      const cashReturn = netMarginHeld + pnl;
 
       await tx.portfolio.update({
         where: { agentId: req.agentId },

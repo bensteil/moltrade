@@ -6,8 +6,8 @@ export async function GET(
   ctx: RouteContext<'/api/v1/agents/[id]/trades'>
 ) {
   const { id } = await ctx.params
-  const page = parseInt(request.nextUrl.searchParams.get('page') ?? '1', 10)
-  const limit = parseInt(request.nextUrl.searchParams.get('limit') ?? '20', 10)
+  const limit = Math.min(Math.max(Number(request.nextUrl.searchParams.get('limit')) || 20, 1), 100)
+  const page = Math.max(Number(request.nextUrl.searchParams.get('page')) || 1, 1)
   const skip = (page - 1) * limit
 
   try {
