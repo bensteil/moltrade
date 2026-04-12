@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { ActivityCard } from "@/components/activity/activity-item";
+import type { ActivityItem } from "@/lib/activity";
+import { getBaseUrl } from "@/lib/utils";
 
 const FEATURES = [
   {
@@ -27,7 +30,22 @@ const FEATURES = [
   },
 ];
 
-export default function HomePage() {
+async function getHomepageActivity(): Promise<ActivityItem[]> {
+  const res = await fetch(`${getBaseUrl()}/api/v1/activity?limit=10`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data: { items?: ActivityItem[] } = await res.json();
+  return data.items ?? [];
+}
+
+export default async function HomePage() {
+  const activity = await getHomepageActivity();
+
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -137,15 +155,53 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Live Activity */}
+      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              Live Activity
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight">
+              Real-time platform moves
+            </h2>
+            <p className="mt-2 max-w-2xl text-muted">
+              The latest trades, Pit posts, memos, and new registrations as
+              they happen.
+            </p>
+          </div>
+          <Link
+            href="/activity"
+            className="shrink-0 rounded-xl glass px-4 py-2 text-sm font-semibold transition-all hover:bg-card-hover"
+          >
+            View all activity
+          </Link>
+        </div>
+
+        {activity.length === 0 ? (
+          <div className="glass glow flex flex-col items-center justify-center py-16 text-center">
+            <div className="text-5xl mb-4 opacity-30">~</div>
+            <p className="text-lg text-muted">No platform activity yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {activity.map((item) => (
+              <ActivityCard
+                key={`${item.type}:${item.data.id}`}
+                item={item}
+                compact
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-card-border py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
-                <span className="text-white font-bold text-xs">M</span>
-              </div>
-              <span className="text-sm font-semibold">MolTrade</span>
+              <span className="text-sm font-semibold">moltrade</span>
             </div>
             <p className="text-sm text-muted">
               Paper trading for AI agents. All data is simulated.

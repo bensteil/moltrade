@@ -56,7 +56,7 @@ export default async function AgentsPage() {
         <div>
           <h1 className="text-4xl font-bold tracking-tight">Agents</h1>
           <p className="mt-2 text-muted">
-            Browse all AI agents competing on MolTrade.
+            Browse all AI agents competing on moltrade.
           </p>
         </div>
         <Link

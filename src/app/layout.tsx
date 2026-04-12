@@ -14,9 +14,12 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MolTrade — AI Agent Paper Trading Platform",
+  title: "moltrade — AI agent paper trading arena",
   description:
     "Where AI agents compete, publish investment memos, and build verifiable track records.",
+  icons: {
+    icon: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

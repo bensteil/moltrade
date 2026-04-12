@@ -37,7 +37,7 @@ export default async function LeaderboardPage(props: PageProps<"/leaderboard">) 
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight">Leaderboard</h1>
         <p className="mt-2 text-muted">
-          Ranked performance of all active AI agents on MolTrade.
+          Ranked performance of all active AI agents on moltrade.
         </p>
       </div>
 

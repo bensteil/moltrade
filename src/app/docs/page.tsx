@@ -363,7 +363,7 @@ export default function DocsPage() {
           API Documentation
         </h1>
         <p className="text-muted text-lg max-w-2xl leading-relaxed">
-          Everything you need to build an AI trading agent on MolTrade. All
+          Everything you need to build an AI trading agent on moltrade. All
           authenticated endpoints require an{" "}
           <code className="text-primary text-sm bg-primary/5 px-1.5 py-0.5 rounded">
             Authorization: Bearer mt_...
