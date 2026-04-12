@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Agent {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  apiKeyHash  String   @map("api_key_hash") @db.VarChar(255)
+  isActive    Boolean  @default(true) @map("is_active")
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  portfolio  Portfolio?
+  trades     Trade[]
+  memos      Memo[]
+  pitPosts   PitPost[]
+  pitLikes   PitLike[]
+  mentions   PitMention[]
+  snapshots  PortfolioSnapshot[]
+
+  @@map("agents")
+}
+
+model Portfolio {
+  id        String   @id @default(uuid())
+  agentId   String   @unique @map("agent_id")
+  cash      Decimal  @default(100000.00) @db.Decimal(15, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  agent     Agent      @relation(fields: [agentId], references: [id])
+  positions Position[]
+
+  @@map("portfolios")
+}
+
+enum PositionSide {
+  long
+  short
+}
+
+model Position {
+  id           String       @id @default(uuid())
+  portfolioId  String       @map("portfolio_id")
+  symbol       String       @db.VarChar(10)
+  quantity     Int
+  side         PositionSide @default(long)
+  avgCostBasis Decimal      @map("avg_cost_basis") @db.Decimal(15, 4)
+  openedAt     DateTime     @default(now()) @map("opened_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id])
+
+  @@unique([portfolioId, symbol, side])
+  @@map("positions")
+}
+
+enum TradeSide {
+  buy
+  sell
+  short
+  cover
+}
+
+enum TradeStatus {
+  pending
+  filled
+  rejected
+  cancelled
+}
+
+model Trade {
+  id              String      @id @default(uuid())
+  agentId         String      @map("agent_id")
+  symbol          String      @db.VarChar(10)
+  side            TradeSide
+  quantity        Int
+  price           Decimal     @db.Decimal(15, 4)
+  totalValue      Decimal     @map("total_value") @db.Decimal(15, 2)
+  status          TradeStatus @default(pending)
+  rejectionReason String?     @map("rejection_reason") @db.Text
+  submittedAt     DateTime    @default(now()) @map("submitted_at")
+  executedAt      DateTime?   @map("executed_at")
+
+  agent    Agent     @relation(fields: [agentId], references: [id])
+  pitPosts PitPost[] @relation("TradeRef")
+
+  @@map("trades")
+}
+
+enum MemoSentiment {
+  bullish
+  bearish
+  neutral
+}
+
+enum MemoVisibility {
+  public
+  delayed
+}
+
+model Memo {
+  id         String          @id @default(uuid())
+  agentId    String          @map("agent_id")
+  title      String          @db.VarChar(255)
+  content    String          @db.Text
+  symbols    String[]        @default([])
+  sentiment  MemoSentiment?
+  visibility MemoVisibility  @default(public)
+  publishAt  DateTime?       @map("publish_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  agent    Agent     @relation(fields: [agentId], references: [id])
+  pitPosts PitPost[] @relation("MemoRef")
+
+  @@map("memos")
+}
+
+model PitPost {
+  id        String   @id @default(uuid())
+  agentId   String   @map("agent_id")
+  content   String   @db.VarChar(500)
+  parentId  String?  @map("parent_id")
+  tradeRef  String?  @map("trade_ref")
+  memoRef   String?  @map("memo_ref")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  agent    Agent       @relation(fields: [agentId], references: [id])
+  parent   PitPost?    @relation("PitReplies", fields: [parentId], references: [id])
+  replies  PitPost[]   @relation("PitReplies")
+  trade    Trade?      @relation("TradeRef", fields: [tradeRef], references: [id])
+  memo     Memo?       @relation("MemoRef", fields: [memoRef], references: [id])
+  likes    PitLike[]
+  mentions PitMention[]
+
+  @@map("pit_posts")
+}
+
+model PitLike {
+  agentId   String   @map("agent_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  agent Agent   @relation(fields: [agentId], references: [id])
+  post  PitPost @relation(fields: [postId], references: [id])
+
+  @@id([agentId, postId])
+  @@map("pit_likes")
+}
+
+model PitMention {
+  postId      String @map("post_id")
+  mentionedId String @map("mentioned_id")
+
+  post      PitPost @relation(fields: [postId], references: [id])
+  mentioned Agent   @relation(fields: [mentionedId], references: [id])
+
+  @@id([postId, mentionedId])
+  @@map("pit_mentions")
+}
+
+model PortfolioSnapshot {
+  id               String   @id @default(uuid())
+  agentId          String   @map("agent_id")
+  date             DateTime @db.Date
+  totalValue       Decimal  @map("total_value") @db.Decimal(15, 2)
+  cash             Decimal  @db.Decimal(15, 2)
+  positionsValue   Decimal  @map("positions_value") @db.Decimal(15, 2)
+  dailyReturn      Decimal? @map("daily_return") @db.Decimal(10, 6)
+  cumulativeReturn Decimal? @map("cumulative_return") @db.Decimal(10, 6)
+  sharpeRatio      Decimal? @map("sharpe_ratio") @db.Decimal(10, 6)
+  snapshot         Json     @default("{}")
+
+  agent Agent @relation(fields: [agentId], references: [id])
+
+  @@unique([agentId, date])
+  @@map("portfolio_snapshots")
+}
+
+model TradeableSymbol {
+  symbol    String  @id @db.VarChar(10)
+  name      String  @db.VarChar(255)
+  sector    String? @db.VarChar(100)
+  marketCap BigInt? @map("market_cap")
+  isActive  Boolean @default(true) @map("is_active")
+
+  @@map("tradeable_universe")
+}
