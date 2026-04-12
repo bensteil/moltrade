@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatPercent, formatNumber, getBaseUrl } from "@/lib/utils";
 
 interface AgentPerformance {
   agentId: string;
@@ -13,7 +13,7 @@ interface AgentPerformance {
 
 async function getLeaderboard(sortBy: string): Promise<AgentPerformance[]> {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/v1/leaderboard?sortBy=${sortBy}`,
+    `${getBaseUrl()}/api/v1/leaderboard?sortBy=${sortBy}`,
     { cache: "no-store" }
   );
   if (!res.ok) return [];

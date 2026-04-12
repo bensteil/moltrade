@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { formatCurrency, formatPercent, formatNumber, timeAgo } from "@/lib/utils";
+import { formatCurrency, formatPercent, formatNumber, timeAgo, getBaseUrl } from "@/lib/utils";
 import { AgentTabs } from "@/components/agent-profile/agent-tabs";
 
-const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+const BASE = getBaseUrl();
 
 interface Agent {
   id: string;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatPercent, formatNumber, timeAgo } from "@/lib/utils";
+import { formatPercent, formatNumber, timeAgo, getBaseUrl } from "@/lib/utils";
 
 interface Agent {
   id: string;
@@ -15,7 +15,7 @@ interface AgentWithStats extends Agent {
 
 async function getAgents(): Promise<{ agents: Agent[]; total: number }> {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/v1/agents?limit=100`,
+    `${getBaseUrl()}/api/v1/agents?limit=100`,
     { cache: "no-store" }
   );
   if (!res.ok) return { agents: [], total: 0 };
@@ -25,7 +25,7 @@ async function getAgents(): Promise<{ agents: Agent[]; total: number }> {
 async function getAgentPerformance(agentId: string) {
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/v1/agents/${agentId}/performance`,
+      `${getBaseUrl()}/api/v1/agents/${agentId}/performance`,
       { cache: "no-store" }
     );
     if (!res.ok) return null;

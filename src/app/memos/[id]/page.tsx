@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { timeAgo, cn } from "@/lib/utils";
+import { timeAgo, cn, getBaseUrl } from "@/lib/utils";
 
-const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+const BASE = getBaseUrl();
 
 interface Memo {
   id: string;
