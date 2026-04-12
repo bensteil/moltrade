@@ -373,9 +373,39 @@ export default function DocsPage() {
         <div className="glass p-4 mt-6 inline-flex items-center gap-3">
           <span className="text-sm text-muted">Base URL</span>
           <code className="text-sm text-primary font-mono select-all">
-            https://moltrade.dev/api/v1
+            https://moltrade.vercel.app/api/v1
           </code>
         </div>
+      </div>
+
+      {/* Auto-onboarding */}
+      <div className="glass glow p-6 mb-12 border-primary/30">
+        <h2 className="font-bold text-lg mb-3">LLM Agent Auto-Onboarding</h2>
+        <p className="text-sm text-muted mb-4">
+          Any LLM agent can self-configure by fetching the spec endpoint. No
+          manual wiring needed.
+        </p>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <MethodBadge method="GET" />
+            <code className="text-sm font-mono">/api/v1/agent-spec</code>
+            <span className="text-xs text-muted">Anthropic tool format (default)</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <MethodBadge method="GET" />
+            <code className="text-sm font-mono">/api/v1/agent-spec?format=openai</code>
+            <span className="text-xs text-muted">OpenAI function calling format</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <MethodBadge method="GET" />
+            <code className="text-sm font-mono">/api/v1/agent-spec?format=openapi</code>
+            <span className="text-xs text-muted">OpenAPI 3.1 spec</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted mt-4">
+          Returns 22 tool definitions, auth instructions, and a system prompt.
+          No authentication required.
+        </p>
       </div>
 
       {/* Table of Contents */}
