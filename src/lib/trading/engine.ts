@@ -73,91 +73,58 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
   const price = quote.price;
   const totalValue = price * req.quantity;
 
-  // 4. Get portfolio
-  const portfolio = await prisma.portfolio.findUnique({
-    where: { agentId: req.agentId },
-    include: { positions: true },
-  });
-
-  if (!portfolio) {
-    return {
-      success: false,
-      error: { code: "no_portfolio", message: "Portfolio not found" },
-    };
-  }
-
-  const cash = Number(portfolio.cash);
-
-  // 5. Validate based on trade side
-  switch (req.side) {
-    case "buy": {
-      if (totalValue > cash) {
-        return {
-          success: false,
-          error: {
-            code: "insufficient_funds",
-            message: `Need $${totalValue.toFixed(2)} but only have $${cash.toFixed(2)}`,
-          },
-        };
-      }
-      break;
-    }
-    case "sell": {
-      const position = portfolio.positions.find(
-        (p) => p.symbol === req.symbol.toUpperCase() && p.side === "long"
-      );
-      if (!position || position.quantity < req.quantity) {
-        return {
-          success: false,
-          error: {
-            code: "insufficient_shares",
-            message: `Not enough shares to sell. Have ${position?.quantity ?? 0}, need ${req.quantity}`,
-          },
-        };
-      }
-      break;
-    }
-    case "short": {
-      const marginRequired = totalValue * SHORT_MARGIN_REQUIREMENT;
-      if (marginRequired > cash) {
-        return {
-          success: false,
-          error: {
-            code: "insufficient_margin",
-            message: `Need $${marginRequired.toFixed(2)} margin (150%) but only have $${cash.toFixed(2)}`,
-          },
-        };
-      }
-      break;
-    }
-    case "cover": {
-      const shortPosition = portfolio.positions.find(
-        (p) => p.symbol === req.symbol.toUpperCase() && p.side === "short"
-      );
-      if (!shortPosition || shortPosition.quantity < req.quantity) {
-        return {
-          success: false,
-          error: {
-            code: "insufficient_short_shares",
-            message: `Not enough short shares to cover. Have ${shortPosition?.quantity ?? 0}, need ${req.quantity}`,
-          },
-        };
-      }
-      if (totalValue > cash) {
-        return {
-          success: false,
-          error: {
-            code: "insufficient_funds",
-            message: `Need $${totalValue.toFixed(2)} to cover but only have $${cash.toFixed(2)}`,
-          },
-        };
-      }
-      break;
-    }
-  }
-
-  // 6. Execute in a transaction
+  // 4. Execute validation + trade in a single transaction
+  try {
   const trade = await prisma.$transaction(async (tx) => {
+    // Fetch portfolio INSIDE transaction for consistency
+    const portfolio = await tx.portfolio.findUnique({
+      where: { agentId: req.agentId },
+      include: { positions: true },
+    });
+
+    if (!portfolio) {
+      throw new Error("JSON:no_portfolio:Portfolio not found");
+    }
+
+    const cash = Number(portfolio.cash);
+
+    // Validate based on trade side
+    switch (req.side) {
+      case "buy": {
+        if (totalValue > cash) {
+          throw new Error(`JSON:insufficient_funds:Need $${totalValue.toFixed(2)} but only have $${cash.toFixed(2)}`);
+        }
+        break;
+      }
+      case "sell": {
+        const position = portfolio.positions.find(
+          (p) => p.symbol === req.symbol.toUpperCase() && p.side === "long"
+        );
+        if (!position || position.quantity < req.quantity) {
+          throw new Error(`JSON:insufficient_shares:Not enough shares to sell. Have ${position?.quantity ?? 0}, need ${req.quantity}`);
+        }
+        break;
+      }
+      case "short": {
+        const marginRequired = totalValue * SHORT_MARGIN_REQUIREMENT;
+        if (marginRequired > cash) {
+          throw new Error(`JSON:insufficient_margin:Need $${marginRequired.toFixed(2)} margin (150%) but only have $${cash.toFixed(2)}`);
+        }
+        break;
+      }
+      case "cover": {
+        const shortPosition = portfolio.positions.find(
+          (p) => p.symbol === req.symbol.toUpperCase() && p.side === "short"
+        );
+        if (!shortPosition || shortPosition.quantity < req.quantity) {
+          throw new Error(`JSON:insufficient_short_shares:Not enough short shares to cover. Have ${shortPosition?.quantity ?? 0}, need ${req.quantity}`);
+        }
+        if (totalValue > cash) {
+          throw new Error(`JSON:insufficient_funds:Need $${totalValue.toFixed(2)} to cover but only have $${cash.toFixed(2)}`);
+        }
+        break;
+      }
+    }
     // Create trade record
     const trade = await tx.trade.create({
       data: {
@@ -333,4 +300,12 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
       executedAt: trade.executedAt!.toISOString(),
     },
   };
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg.startsWith("JSON:")) {
+      const [, code, message] = msg.split(":");
+      return { success: false, error: { code, message } };
+    }
+    throw e;
+  }
 }

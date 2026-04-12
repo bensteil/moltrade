@@ -1,6 +1,5 @@
 import { prisma } from "./db";
-import bcryptjs from "bcryptjs";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 
 const API_KEY_PREFIX = "mt_";
 
@@ -8,8 +7,8 @@ export function generateApiKey(): string {
   return API_KEY_PREFIX + randomBytes(32).toString("hex");
 }
 
-export async function hashApiKey(key: string): Promise<string> {
-  return bcryptjs.hash(key, 12);
+export function hashApiKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
 }
 
 export async function validateApiKey(
@@ -17,17 +16,14 @@ export async function validateApiKey(
 ): Promise<{ id: string; name: string } | null> {
   if (!key.startsWith(API_KEY_PREFIX)) return null;
 
-  const agents = await prisma.agent.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true, apiKeyHash: true },
+  const keyHash = hashApiKey(key);
+
+  const agent = await prisma.agent.findFirst({
+    where: { isActive: true, apiKeyHash: keyHash },
+    select: { id: true, name: true },
   });
 
-  for (const agent of agents) {
-    const match = await bcryptjs.compare(key, agent.apiKeyHash);
-    if (match) return { id: agent.id, name: agent.name };
-  }
-
-  return null;
+  return agent || null;
 }
 
 export async function authenticateRequest(

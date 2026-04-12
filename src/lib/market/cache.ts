@@ -5,6 +5,11 @@ const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
 const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || "";
 const NEWS_API_KEY = process.env.NEWS_API_KEY || "";
+const API_TIMEOUT = 8000;
+
+function fetchWithTimeout(url: string, timeoutMs = API_TIMEOUT): Promise<Response> {
+  return fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+}
 
 // Cache TTLs in seconds
 const QUOTE_TTL = 60; // 1 minute
@@ -107,7 +112,7 @@ export async function getFundamentals(
       async () => {
         // Try Alpha Vantage for fundamentals
         const url = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url);
         if (!res.ok) throw new Error(`Alpha Vantage error: ${res.status}`);
         const data = await res.json();
         if (data["Error Message"] || data["Note"]) throw new Error("AV rate limit");
@@ -142,7 +147,7 @@ export async function getNews(
       return [];
     }
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(searchQuery)}&language=en&sortBy=publishedAt&pageSize=20&apiKey=${NEWS_API_KEY}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return [];
     const data = await res.json();
     return (data.articles || []).map(
@@ -159,7 +164,7 @@ export async function getNews(
 
 async function fetchAlphaVantageQuote(symbol: string): Promise<Quote> {
   const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   const data = await res.json();
   const gq = data["Global Quote"];
   if (!gq) throw new Error("No quote data");

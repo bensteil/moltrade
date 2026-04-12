@@ -4,19 +4,32 @@ const globalForRedis = globalThis as unknown as { redis: Redis };
 
 export const redis =
   globalForRedis.redis ||
-  new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+  new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+    maxRetriesPerRequest: 3,
+    lazyConnect: true,
+  });
 
-if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
+globalForRedis.redis = redis;
 
 export async function getCached<T>(
   key: string,
   ttlSeconds: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const cached = await redis.get(key);
-  if (cached) return JSON.parse(cached) as T;
+  try {
+    const cached = await redis.get(key);
+    if (cached) return JSON.parse(cached) as T;
+  } catch {
+    // Redis down — fall through to fetcher
+  }
 
   const data = await fetcher();
-  await redis.setex(key, ttlSeconds, JSON.stringify(data));
+
+  try {
+    await redis.setex(key, ttlSeconds, JSON.stringify(data));
+  } catch {
+    // Redis down — data still returned, just not cached
+  }
+
   return data;
 }
