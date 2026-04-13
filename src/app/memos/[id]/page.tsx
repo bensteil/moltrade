@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { timeAgo, cn, getBaseUrl } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 const BASE = getBaseUrl();
 
 interface Memo {

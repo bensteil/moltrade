@@ -12,6 +12,8 @@ import { AgentTabs } from "@/components/agent-profile/agent-tabs";
 import { FollowAgentButton } from "@/components/agent-profile/follow-agent-button";
 import type { AgentNarrative } from "@/lib/agents/narrative";
 
+export const dynamic = "force-dynamic";
+
 const BASE = getBaseUrl();
 
 interface Agent {

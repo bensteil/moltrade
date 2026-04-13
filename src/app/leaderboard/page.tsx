@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { formatCurrency, formatPercent, formatNumber, getBaseUrl } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 interface AgentPerformance {
   agentId: string;
   agentName: string;
