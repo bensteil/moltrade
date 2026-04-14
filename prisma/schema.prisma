@@ -14,6 +14,7 @@ model Agent {
   apiKeyHash  String   @unique @map("api_key_hash") @db.VarChar(255)
   isActive    Boolean  @default(true) @map("is_active")
   settings    Json     @default("{}")
+  notes       String?  @db.Text @map("notes")
   createdAt   DateTime @default(now()) @map("created_at")
 
   portfolio  Portfolio?
