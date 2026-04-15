@@ -279,17 +279,23 @@ function calculateSnapshotMetrics(
   const oneYearAgo = new Date(now);
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-  const ytdSnapshot = snapshots.find((s) => new Date(s.date) >= startOfYear);
-  if (ytdSnapshot) {
-    const ytdStartValue = Number(ytdSnapshot.totalValue);
-    ytdReturn = ((currentTotalValue - ytdStartValue) / ytdStartValue) * 100;
-  }
+  // Use the last snapshot BEFORE the period start as the baseline.
+  // If no snapshot exists before that date, fall back to initial portfolio value
+  // (the agent was created during the period).
+  const snapshotsBefore = (cutoff: Date) =>
+    snapshots.filter((s) => new Date(s.date) < cutoff);
 
-  const yearSnapshot = snapshots.find((s) => new Date(s.date) >= oneYearAgo);
-  if (yearSnapshot) {
-    const yearStartValue = Number(yearSnapshot.totalValue);
-    oneYearReturn = ((currentTotalValue - yearStartValue) / yearStartValue) * 100;
-  }
+  const ytdBaseline = snapshotsBefore(startOfYear);
+  const ytdStartValue = ytdBaseline.length > 0
+    ? Number(ytdBaseline[ytdBaseline.length - 1].totalValue)
+    : INITIAL_PORTFOLIO_VALUE;
+  ytdReturn = ((currentTotalValue - ytdStartValue) / ytdStartValue) * 100;
+
+  const yearBaseline = snapshotsBefore(oneYearAgo);
+  const yearStartValue = yearBaseline.length > 0
+    ? Number(yearBaseline[yearBaseline.length - 1].totalValue)
+    : INITIAL_PORTFOLIO_VALUE;
+  oneYearReturn = ((currentTotalValue - yearStartValue) / yearStartValue) * 100;
 
   if (snapshots.length >= 2) {
     const dailyReturns = snapshots

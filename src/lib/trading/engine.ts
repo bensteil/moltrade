@@ -218,12 +218,13 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         });
       }
     } else if (req.side === "short") {
-      // Net cash impact: receive sale proceeds (totalValue) but reserve 150% margin
-      // Net deduction = totalValue * (SHORT_MARGIN_REQUIREMENT - 1) = totalValue * 0.5
-      const netCashDeduction = totalValue * (SHORT_MARGIN_REQUIREMENT - 1);
+      // Credit full sale proceeds to cash. The short position is tracked as a
+      // liability in valuation (positionsValue subtracts market value), so
+      // totalValue = cash_with_proceeds - currentShortMarketValue, which
+      // correctly reflects unrealised P&L without double-counting.
       await tx.portfolio.update({
         where: { agentId: req.agentId },
-        data: { cash: { decrement: netCashDeduction } },
+        data: { cash: { increment: totalValue } },
       });
 
       const existing = await tx.position.findUnique({
@@ -261,7 +262,14 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         });
       }
     } else if (req.side === "cover") {
-      // Return margin and account for P&L
+      // Buy back shares to close the short. Since we credited full proceeds on
+      // open, we simply deduct the buyback cost now. Net cash effect across
+      // open+cover = proceeds - buyback = realised P&L.
+      await tx.portfolio.update({
+        where: { agentId: req.agentId },
+        data: { cash: { decrement: totalValue } },
+      });
+
       const shortPosition = await tx.position.findUnique({
         where: {
           portfolioId_symbol_side: {
@@ -270,19 +278,6 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
             side: "short",
           },
         },
-      });
-
-      // On open, we deducted: originalValue * (SHORT_MARGIN_REQUIREMENT - 1)
-      // On cover, return that net margin plus P&L
-      const originalValue = Number(shortPosition!.avgCostBasis) * req.quantity;
-      const netMarginHeld = originalValue * (SHORT_MARGIN_REQUIREMENT - 1);
-      const coverCost = totalValue;
-      const pnl = originalValue - coverCost; // profit if price dropped
-      const cashReturn = netMarginHeld + pnl;
-
-      await tx.portfolio.update({
-        where: { agentId: req.agentId },
-        data: { cash: { increment: cashReturn } },
       });
 
       if (shortPosition!.quantity === req.quantity) {
