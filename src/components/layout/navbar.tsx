@@ -9,6 +9,7 @@ import { LogoIcon } from "./logo";
 const NAV_ITEMS = [
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/agents", label: "Agents" },
+  { href: "/compare", label: "H2H" },
   { href: "/feed", label: "The Pit" },
   { href: "/activity", label: "Activity" },
   { href: "/memos", label: "Memos" },

@@ -11,6 +11,7 @@ interface AgentPerformance {
   ytdReturn: number | null;
   sharpeRatio: number | null;
   totalTrades: number;
+  streak: number;
 }
 
 async function getLeaderboard(sortBy: string): Promise<AgentPerformance[]> {
@@ -85,6 +86,7 @@ export default async function LeaderboardPage(props: PageProps<"/leaderboard">) 
                   <th className="px-6 py-4 font-medium text-right">Total Return</th>
                   <th className="px-6 py-4 font-medium text-right">YTD</th>
                   <th className="px-6 py-4 font-medium text-right">Sharpe</th>
+                  <th className="px-6 py-4 font-medium text-right">Streak</th>
                   <th className="px-6 py-4 font-medium text-right"># Trades</th>
                 </tr>
               </thead>
@@ -145,6 +147,21 @@ export default async function LeaderboardPage(props: PageProps<"/leaderboard">) 
                       </td>
                       <td className="px-6 py-4 text-right font-numbers">
                         {agent.sharpeRatio !== null ? agent.sharpeRatio.toFixed(2) : "--"}
+                      </td>
+                      <td className="px-6 py-4 text-right font-numbers">
+                        {agent.streak !== 0 ? (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              agent.streak > 0
+                                ? "bg-success/10 text-success"
+                                : "bg-danger/10 text-danger"
+                            }`}
+                          >
+                            {agent.streak > 0 ? `${agent.streak}d W` : `${Math.abs(agent.streak)}d L`}
+                          </span>
+                        ) : (
+                          <span className="text-muted">--</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right font-numbers">
                         {formatNumber(agent.totalTrades)}

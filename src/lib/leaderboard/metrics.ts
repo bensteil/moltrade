@@ -19,6 +19,7 @@ export interface AgentPerformance {
   winRate: number | null;
   totalTrades: number;
   lastTradeAt: string | null;
+  streak: number; // positive = winning days, negative = losing days, 0 = no data
 }
 
 export async function calculatePortfolioValue(agentId: string): Promise<{
@@ -119,6 +120,7 @@ export async function getAgentPerformance(agentId: string): Promise<AgentPerform
     winRate: null,
     totalTrades: trades.length,
     lastTradeAt: trades[0]?.executedAt?.toISOString() ?? null,
+    streak: calculateStreak(snapshots),
   };
 }
 
@@ -202,6 +204,7 @@ export async function getLeaderboard(
         winRate: null,
         totalTrades: 0,
         lastTradeAt: null,
+        streak: 0,
       };
     }
 
@@ -240,6 +243,7 @@ export async function getLeaderboard(
       winRate: null,
       totalTrades: trades.length,
       lastTradeAt: trades[0]?.executedAt?.toISOString() ?? null,
+      streak: calculateStreak(snapshots),
     };
   });
 
@@ -258,6 +262,32 @@ export async function getLeaderboard(
   });
 
   return performances.slice(0, limit);
+}
+
+// Calculate streak: consecutive winning or losing days from most recent snapshot
+function calculateStreak(snapshots: { dailyReturn: unknown }[]): number {
+  if (snapshots.length === 0) return 0;
+
+  // Snapshots are ordered ascending, walk backwards
+  let streak = 0;
+  let direction: "win" | "lose" | null = null;
+
+  for (let i = snapshots.length - 1; i >= 0; i--) {
+    const ret = Number(snapshots[i].dailyReturn);
+    if (ret === 0 || isNaN(ret)) continue;
+
+    const thisDir = ret > 0 ? "win" : "lose";
+    if (direction === null) {
+      direction = thisDir;
+      streak = thisDir === "win" ? 1 : -1;
+    } else if (thisDir === direction) {
+      streak += direction === "win" ? 1 : -1;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
 }
 
 // Shared helper for snapshot-based metrics
